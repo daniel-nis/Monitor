@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Crypto Monitor - Bitcoin Prices</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #f39c12, #e74c3c, #9b59b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #8892b0;
+            font-size: 1.1rem;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+            transition: background 0.3s;
+        }
+
+        .status-dot.connected {
+            background: #2ecc71;
+            box-shadow: 0 0 10px #2ecc71;
+        }
+
+        .status-dot.connecting {
+            background: #f39c12;
+            animation: pulse 1s infinite;
+        }
+
+        .status-dot.error {
+            background: #e74c3c;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .comparison-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .comparison-section h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #64ffda;
+        }
+
+        .comparison-chart-container {
+            height: 400px;
+            position: relative;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .exchange-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .exchange-logo {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .price-display {
+            text-align: right;
+        }
+
+        .current-price {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #64ffda;
+            transition: color 0.3s;
+        }
+
+        .current-price.up {
+            color: #2ecc71;
+        }
+
+        .current-price.down {
+            color: #e74c3c;
+        }
+
+        .price-change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .price-change.positive {
+            color: #2ecc71;
+        }
+
+        .price-change.negative {
+            color: #e74c3c;
+        }
+
+        .chart-container {
+            height: 200px;
+            position: relative;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #8892b0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #8892b0;
+            font-size: 0.9rem;
+        }
+
+        .spread-indicator {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .spread-indicator h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #f39c12;
+        }
+
+        .spread-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .spread-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .spread-label {
+            font-size: 0.85rem;
+            color: #8892b0;
+            margin-bottom: 5px;
+        }
+
+        .spread-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .spread-value.positive {
+            color: #2ecc71;
+        }
+
+        .spread-value.negative {
+            color: #e74c3c;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .current-price {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>₿ Live Bitcoin Monitor</h1>
+        <p>Real-time prices from multiple exchanges via WebSocket</p>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+        <!-- Status indicators will be dynamically added -->
+    </div>
+
+    <div class="spread-indicator">
+        <h2>📊 Cross-Exchange Spread Analysis</h2>
+        <div class="spread-grid" id="spreadGrid">
+            <div class="spread-item">
+                <div class="spread-label">Highest Price</div>
+                <div class="spread-value" id="highestPrice">--</div>
+                <div class="spread-label" id="highestExchange">--</div>
+            </div>
+            <div class="spread-item">
+                <div class="spread-label">Lowest Price</div>
+                <div class="spread-value" id="lowestPrice">--</div>
+                <div class="spread-label" id="lowestExchange">--</div>
+            </div>
+            <div class="spread-item">
+                <div class="spread-label">Spread</div>
+                <div class="spread-value" id="spreadValue">--</div>
+                <div class="spread-label">Arbitrage Opportunity</div>
+            </div>
+            <div class="spread-item">
+                <div class="spread-label">Average Price</div>
+                <div class="spread-value" id="avgPrice">--</div>
+                <div class="spread-label">Across All Exchanges</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="comparison-section">
+        <h2>📈 All Exchanges Comparison</h2>
+        <div class="comparison-chart-container">
+            <canvas id="comparisonChart"></canvas>
+        </div>
+    </div>
+
+    <div class="grid" id="exchangeGrid">
+        <!-- Exchange cards will be dynamically added -->
+    </div>
+
+    <div class="footer">
+        <p>Data streams via WebSocket connections • Prices update in real-time</p>
+        <p style="margin-top: 5px;">Note: Polymarket is a prediction market, not a price feed. Using major crypto exchanges instead.</p>
+    </div>
+
+    <script>
+        // Exchange configurations
+        const exchanges = {
+            binance: {
+                name: 'Binance',
+                color: '#F3BA2F',
+                ws: 'wss://stream.binance.com:9443/ws/btcusdt@trade',
+                parseMessage: (data) => {
+                    const msg = JSON.parse(data);
+                    if (msg.e === 'trade') {
+                        return { price: parseFloat(msg.p), volume: parseFloat(msg.q) };
+                    }
+                    return null;
+                }
+            },
+            coinbase: {
+                name: 'Coinbase',
+                color: '#0052FF',
+                ws: 'wss://ws-feed.exchange.coinbase.com',
+                subscribe: JSON.stringify({
+                    type: 'subscribe',
+                    product_ids: ['BTC-USD'],
+                    channels: ['ticker']
+                }),
+                parseMessage: (data) => {
+                    const msg = JSON.parse(data);
+                    if (msg.type === 'ticker' && msg.price) {
+                        return { price: parseFloat(msg.price), volume: parseFloat(msg.last_size || 0) };
+                    }
+                    return null;
+                }
+            },
+            kraken: {
+                name: 'Kraken',
+                color: '#5741D9',
+                ws: 'wss://ws.kraken.com',
+                subscribe: JSON.stringify({
+                    event: 'subscribe',
+                    pair: ['XBT/USD'],
+                    subscription: { name: 'trade' }
+                }),
+                parseMessage: (data) => {
+                    const msg = JSON.parse(data);
+                    if (Array.isArray(msg) && msg[2] === 'trade') {
+                        const trades = msg[1];
+                        if (trades && trades.length > 0) {
+                            const lastTrade = trades[trades.length - 1];
+                            return { price: parseFloat(lastTrade[0]), volume: parseFloat(lastTrade[1]) };
+                        }
+                    }
+                    return null;
+                }
+            },
+            bitstamp: {
+                name: 'Bitstamp',
+                color: '#2ECC71',
+                ws: 'wss://ws.bitstamp.net',
+                subscribe: JSON.stringify({
+                    event: 'bts:subscribe',
+                    data: { channel: 'live_trades_btcusd' }
+                }),
+                parseMessage: (data) => {
+                    const msg = JSON.parse(data);
+                    if (msg.event === 'trade' && msg.data) {
+                        return { price: parseFloat(msg.data.price), volume: parseFloat(msg.data.amount) };
+                    }
+                    return null;
+                }
+            },
+            okx: {
+                name: 'OKX',
+                color: '#FFFFFF',
+                ws: 'wss://ws.okx.com:8443/ws/v5/public',
+                subscribe: JSON.stringify({
+                    op: 'subscribe',
+                    args: [{ channel: 'trades', instId: 'BTC-USDT' }]
+                }),
+                parseMessage: (data) => {
+                    const msg = JSON.parse(data);
+                    if (msg.data && msg.data.length > 0) {
+                        const trade = msg.data[0];
+                        return { price: parseFloat(trade.px), volume: parseFloat(trade.sz) };
+                    }
+                    return null;
+                }
+            },
+            bybit: {
+                name: 'Bybit',
+                color: '#F7A600',
+                ws: 'wss://stream.bybit.com/v5/public/spot',
+                subscribe: JSON.stringify({
+                    op: 'subscribe',
+                    args: ['publicTrade.BTCUSDT']
+                }),
+                parseMessage: (data) => {
+                    const msg = JSON.parse(data);
+                    if (msg.topic === 'publicTrade.BTCUSDT' && msg.data) {
+                        const trade = msg.data[msg.data.length - 1];
+                        return { price: parseFloat(trade.p), volume: parseFloat(trade.v) };
+                    }
+                    return null;
+                }
+            }
+        };
+
+        // State management
+        const state = {};
+        const charts = {};
+        const MAX_DATA_POINTS = 100;
+        let comparisonChart = null;
+
+        // Initialize exchange state
+        Object.keys(exchanges).forEach(key => {
+            state[key] = {
+                prices: [],
+                timestamps: [],
+                currentPrice: null,
+                previousPrice: null,
+                high: null,
+                low: null,
+                volume: 0,
+                status: 'connecting',
+                ws: null,
+                reconnectAttempts: 0
+            };
+        });
+
+        // Create status bar
+        function createStatusBar() {
+            const statusBar = document.getElementById('statusBar');
+            Object.keys(exchanges).forEach(key => {
+                const item = document.createElement('div');
+                item.className = 'status-item';
+                item.innerHTML = `
+                    <div class="status-dot connecting" id="status-${key}"></div>
+                    <span>${exchanges[key].name}</span>
+                `;
+                statusBar.appendChild(item);
+            });
+        }
+
+        // Create exchange cards
+        function createExchangeCards() {
+            const grid = document.getElementById('exchangeGrid');
+            Object.keys(exchanges).forEach(key => {
+                const exchange = exchanges[key];
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.id = `card-${key}`;
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="exchange-name">
+                            <div class="exchange-logo" style="background: ${exchange.color}20; color: ${exchange.color}">
+                                ${exchange.name.charAt(0)}
+                            </div>
+                            ${exchange.name}
+                        </div>
+                        <div class="price-display">
+                            <div class="current-price" id="price-${key}">Connecting...</div>
+                            <div class="price-change" id="change-${key}">--</div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chart-${key}"></canvas>
+                    </div>
+                    <div class="stats">
+                        <div class="stat">
+                            <div class="stat-label">High</div>
+                            <div class="stat-value" id="high-${key}">--</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Low</div>
+                            <div class="stat-value" id="low-${key}">--</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Volume</div>
+                            <div class="stat-value" id="volume-${key}">--</div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Initialize charts
+        function initCharts() {
+            Object.keys(exchanges).forEach(key => {
+                const ctx = document.getElementById(`chart-${key}`).getContext('2d');
+                charts[key] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Price',
+                            data: [],
+                            borderColor: exchanges[key].color,
+                            backgroundColor: `${exchanges[key].color}20`,
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(0,0,0,0.8)',
+                                titleColor: '#fff',
+                                bodyColor: '#fff',
+                                callbacks: {
+                                    label: (ctx) => `$${ctx.raw.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: false
+                            },
+                            y: {
+                                display: true,
+                                grid: {
+                                    color: 'rgba(255,255,255,0.05)'
+                                },
+                                ticks: {
+                                    color: '#8892b0',
+                                    font: { size: 10 },
+                                    callback: (val) => '$' + val.toLocaleString()
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+
+            // Initialize comparison chart
+            const compCtx = document.getElementById('comparisonChart').getContext('2d');
+            const datasets = Object.keys(exchanges).map(key => ({
+                label: exchanges[key].name,
+                data: [],
+                borderColor: exchanges[key].color,
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            }));
+
+            comparisonChart = new Chart(compCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 0 },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#fff',
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.9)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: $${ctx.raw?.toLocaleString('en-US', { minimumFractionDigits: 2 }) || '--'}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: {
+                                color: '#8892b0',
+                                maxTicksLimit: 10,
+                                font: { size: 10 }
+                            }
+                        },
+                        y: {
+                            display: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: {
+                                color: '#8892b0',
+                                font: { size: 11 },
+                                callback: (val) => '$' + val.toLocaleString()
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update status indicator
+        function updateStatus(exchange, status) {
+            const dot = document.getElementById(`status-${exchange}`);
+            dot.className = `status-dot ${status}`;
+            state[exchange].status = status;
+        }
+
+        // Update UI for an exchange
+        function updateExchangeUI(key) {
+            const s = state[key];
+            if (!s.currentPrice) return;
+
+            // Update price display
+            const priceEl = document.getElementById(`price-${key}`);
+            priceEl.textContent = `$${s.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            // Flash color based on price movement
+            if (s.previousPrice) {
+                priceEl.classList.remove('up', 'down');
+                if (s.currentPrice > s.previousPrice) {
+                    priceEl.classList.add('up');
+                } else if (s.currentPrice < s.previousPrice) {
+                    priceEl.classList.add('down');
+                }
+            }
+
+            // Update change indicator
+            if (s.prices.length > 1) {
+                const firstPrice = s.prices[0];
+                const change = ((s.currentPrice - firstPrice) / firstPrice) * 100;
+                const changeEl = document.getElementById(`change-${key}`);
+                changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(3)}%`;
+                changeEl.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+            }
+
+            // Update stats
+            document.getElementById(`high-${key}`).textContent = s.high ? `$${s.high.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '--';
+            document.getElementById(`low-${key}`).textContent = s.low ? `$${s.low.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '--';
+            document.getElementById(`volume-${key}`).textContent = s.volume ? s.volume.toFixed(4) + ' BTC' : '--';
+
+            // Update individual chart
+            const chart = charts[key];
+            chart.data.labels = s.timestamps.map(t => t.toLocaleTimeString());
+            chart.data.datasets[0].data = [...s.prices];
+            chart.update('none');
+        }
+
+        // Update comparison chart
+        function updateComparisonChart() {
+            // Find the longest timestamp array
+            let maxLen = 0;
+            let timestamps = [];
+            Object.keys(exchanges).forEach(key => {
+                if (state[key].timestamps.length > maxLen) {
+                    maxLen = state[key].timestamps.length;
+                    timestamps = state[key].timestamps;
+                }
+            });
+
+            comparisonChart.data.labels = timestamps.map(t => t.toLocaleTimeString());
+
+            Object.keys(exchanges).forEach((key, index) => {
+                // Pad shorter arrays with null
+                const prices = [...state[key].prices];
+                while (prices.length < maxLen) {
+                    prices.unshift(null);
+                }
+                comparisonChart.data.datasets[index].data = prices;
+            });
+
+            comparisonChart.update('none');
+        }
+
+        // Update spread analysis
+        function updateSpreadAnalysis() {
+            const prices = {};
+            Object.keys(exchanges).forEach(key => {
+                if (state[key].currentPrice) {
+                    prices[key] = state[key].currentPrice;
+                }
+            });
+
+            const priceValues = Object.values(prices);
+            if (priceValues.length < 2) return;
+
+            const highest = Math.max(...priceValues);
+            const lowest = Math.min(...priceValues);
+            const spread = highest - lowest;
+            const avg = priceValues.reduce((a, b) => a + b, 0) / priceValues.length;
+
+            const highestExchange = Object.keys(prices).find(k => prices[k] === highest);
+            const lowestExchange = Object.keys(prices).find(k => prices[k] === lowest);
+
+            document.getElementById('highestPrice').textContent = `$${highest.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('highestExchange').textContent = exchanges[highestExchange].name;
+
+            document.getElementById('lowestPrice').textContent = `$${lowest.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('lowestExchange').textContent = exchanges[lowestExchange].name;
+
+            const spreadEl = document.getElementById('spreadValue');
+            spreadEl.textContent = `$${spread.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            spreadEl.className = `spread-value ${spread > 50 ? 'positive' : ''}`;
+
+            document.getElementById('avgPrice').textContent = `$${avg.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        }
+
+        // Connect to WebSocket
+        function connectWebSocket(key) {
+            const exchange = exchanges[key];
+            const s = state[key];
+
+            try {
+                console.log(`Connecting to ${exchange.name}...`);
+                updateStatus(key, 'connecting');
+
+                const ws = new WebSocket(exchange.ws);
+                s.ws = ws;
+
+                ws.onopen = () => {
+                    console.log(`Connected to ${exchange.name}`);
+                    updateStatus(key, 'connected');
+                    s.reconnectAttempts = 0;
+
+                    if (exchange.subscribe) {
+                        ws.send(exchange.subscribe);
+                    }
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const result = exchange.parseMessage(event.data);
+                        if (result && result.price) {
+                            s.previousPrice = s.currentPrice;
+                            s.currentPrice = result.price;
+
+                            // Update price history
+                            const now = new Date();
+                            s.prices.push(result.price);
+                            s.timestamps.push(now);
+
+                            // Keep only last MAX_DATA_POINTS
+                            if (s.prices.length > MAX_DATA_POINTS) {
+                                s.prices.shift();
+                                s.timestamps.shift();
+                            }
+
+                            // Update high/low
+                            if (!s.high || result.price > s.high) s.high = result.price;
+                            if (!s.low || result.price < s.low) s.low = result.price;
+
+                            // Update volume
+                            if (result.volume) s.volume += result.volume;
+
+                            // Update UI
+                            updateExchangeUI(key);
+                            updateComparisonChart();
+                            updateSpreadAnalysis();
+                        }
+                    } catch (e) {
+                        console.error(`Parse error for ${exchange.name}:`, e);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error(`WebSocket error for ${exchange.name}:`, error);
+                    updateStatus(key, 'error');
+                };
+
+                ws.onclose = () => {
+                    console.log(`Connection closed for ${exchange.name}`);
+                    updateStatus(key, 'error');
+
+                    // Reconnect with exponential backoff
+                    s.reconnectAttempts++;
+                    const delay = Math.min(1000 * Math.pow(2, s.reconnectAttempts), 30000);
+                    console.log(`Reconnecting to ${exchange.name} in ${delay}ms...`);
+                    setTimeout(() => connectWebSocket(key), delay);
+                };
+
+            } catch (error) {
+                console.error(`Failed to connect to ${exchange.name}:`, error);
+                updateStatus(key, 'error');
+            }
+        }
+
+        // Initialize application
+        function init() {
+            createStatusBar();
+            createExchangeCards();
+            initCharts();
+
+            // Connect to all exchanges
+            Object.keys(exchanges).forEach(key => {
+                connectWebSocket(key);
+            });
+
+            // Periodic UI refresh
+            setInterval(() => {
+                Object.keys(exchanges).forEach(key => {
+                    if (state[key].currentPrice) {
+                        updateExchangeUI(key);
+                    }
+                });
+                updateComparisonChart();
+                updateSpreadAnalysis();
+            }, 1000);
+        }
+
+        // Start when DOM is ready
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
