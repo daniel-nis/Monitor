@@ -3,10 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Crypto Monitor - Bitcoin Prices</title>
+    <title>BTC Monitor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-primary: #0A0A0A;
+            --bg-secondary: #141414;
+            --bg-tertiary: #1C1C1C;
+            --bg-card: #111111;
+            --text-primary: #FFFFFF;
+            --text-secondary: #999999;
+            --text-muted: #555555;
+            --green: #00C805;
+            --green-dim: rgba(0, 200, 5, 0.15);
+            --red: #FF5000;
+            --red-dim: rgba(255, 80, 0, 0.15);
+            --amber: #F59E0B;
+            --amber-dim: rgba(245, 158, 11, 0.12);
+            --border: #222222;
+            --border-light: #2A2A2A;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,548 +35,677 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
             min-height: 100vh;
-            color: #fff;
-            padding: 20px;
+            color: var(--text-primary);
         }
 
+        /* ===== HEADER ===== */
         .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            background: linear-gradient(90deg, #f39c12, #e74c3c, #9b59b6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            color: #8892b0;
-            font-size: 1.1rem;
-        }
-
-        .status-bar {
             display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 32px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .status-item {
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+
+        .logo span {
+            color: var(--amber);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .connection-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .connection-dot.live {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+        }
+
+        .header-timer {
             display: flex;
             align-items: center;
             gap: 8px;
             padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            font-size: 0.9rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
         }
 
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #666;
-            transition: background 0.3s;
+        .header-timer-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
         }
 
-        .status-dot.connected {
-            background: #2ecc71;
-            box-shadow: 0 0 10px #2ecc71;
+        .header-timer-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
         }
 
-        .status-dot.connecting {
-            background: #f39c12;
-            animation: pulse 1s infinite;
+        .header-timer.urgent .header-timer-value {
+            color: var(--red);
         }
 
-        .status-dot.error {
-            background: #e74c3c;
+        /* ===== MAIN CONTAINER ===== */
+        .main {
+            padding: 24px 32px;
+            max-width: 1600px;
+            margin: 0 auto;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .comparison-section {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-
-        .comparison-section h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #64ffda;
-        }
-
-        .comparison-chart-container {
-            height: 400px;
-            position: relative;
-        }
-
-        .grid {
+        /* ===== KEY METRICS BAR ===== */
+        .metrics-bar {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
         }
 
-        .card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: transform 0.3s, box-shadow 0.3s;
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
         }
 
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        .metric-card.highlight {
+            border-color: var(--amber);
+            box-shadow: 0 0 20px var(--amber-dim);
         }
 
-        .card-header {
+        .metric-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        .metric-value.up {
+            color: var(--green);
+        }
+
+        .metric-value.down {
+            color: var(--red);
+        }
+
+        .metric-value.amber {
+            color: var(--amber);
+        }
+
+        .metric-sub {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+
+        .metric-sub.up {
+            color: var(--green);
+        }
+
+        .metric-sub.down {
+            color: var(--red);
+        }
+
+        /* ===== POLYMARKET SECTION ===== */
+        .polymarket-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+        }
+
+        .polymarket-section.mispricing {
+            border-color: var(--amber);
+            box-shadow: 0 0 30px var(--amber-dim), inset 0 0 30px var(--amber-dim);
+        }
+
+        .poly-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
-        .exchange-name {
-            font-size: 1.3rem;
-            font-weight: 600;
+        .poly-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        .poly-status {
             display: flex;
             align-items: center;
-            gap: 10px;
-        }
-
-        .exchange-logo {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-
-        .price-display {
-            text-align: right;
-        }
-
-        .current-price {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #64ffda;
-            transition: color 0.3s;
-        }
-
-        .current-price.up {
-            color: #2ecc71;
-        }
-
-        .current-price.down {
-            color: #e74c3c;
-        }
-
-        .price-change {
-            font-size: 0.9rem;
-            margin-top: 5px;
-        }
-
-        .price-change.positive {
-            color: #2ecc71;
-        }
-
-        .price-change.negative {
-            color: #e74c3c;
-        }
-
-        .chart-container {
-            height: 200px;
-            position: relative;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .stat {
-            text-align: center;
-        }
-
-        .stat-label {
+            gap: 6px;
             font-size: 0.75rem;
-            color: #8892b0;
+            color: var(--text-secondary);
+        }
+
+        .poly-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .poly-status-dot.connected {
+            background: var(--green);
+        }
+
+        .poly-status-dot.connecting {
+            background: var(--amber);
+        }
+
+        .poly-status-dot.error {
+            background: var(--red);
+        }
+
+        /* Probability Bar */
+        .probability-container {
+            margin-bottom: 16px;
+        }
+
+        .probability-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .prob-label {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .prob-direction {
+            font-size: 0.75rem;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
-        .stat-value {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-top: 3px;
+        .prob-direction.up {
+            color: var(--green);
         }
 
-        .footer {
-            text-align: center;
-            margin-top: 30px;
-            color: #8892b0;
-            font-size: 0.9rem;
+        .prob-direction.down {
+            color: var(--red);
         }
 
-        .spread-indicator {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-
-        .spread-indicator h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #f39c12;
-        }
-
-        .spread-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        }
-
-        .spread-item {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .spread-label {
-            font-size: 0.85rem;
-            color: #8892b0;
-            margin-bottom: 5px;
-        }
-
-        .spread-value {
-            font-size: 1.3rem;
+        .prob-percent {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
             font-weight: 700;
         }
 
-        .spread-value.positive {
-            color: #2ecc71;
+        .prob-percent.up {
+            color: var(--green);
         }
 
-        .spread-value.negative {
-            color: #e74c3c;
+        .prob-percent.down {
+            color: var(--red);
         }
 
-        .polymarket-section {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(138, 43, 226, 0.3);
+        .probability-bar {
+            height: 32px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
         }
 
-        .polymarket-section h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #a855f7;
+        .prob-bar-up {
+            background: var(--green);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 12px;
         }
 
-        .polymarket-container {
+        .prob-bar-down {
+            background: var(--red);
+            height: 100%;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            padding-left: 12px;
+        }
+
+        .prob-bar-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--bg-primary);
+        }
+
+        /* Bid/Ask Row */
+        .bidask-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .bidask-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .bidask-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        .bidask-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Window info */
+        .poly-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .new-window-badge {
+            display: none;
+            padding: 4px 10px;
+            background: var(--amber);
+            color: var(--bg-primary);
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .new-window-badge.show {
+            display: inline-block;
+        }
+
+        /* ===== EXCHANGE GRID ===== */
+        .exchange-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .exchange-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+        }
+
+        .exchange-card.fastest {
+            border-color: var(--green);
+            position: relative;
+        }
+
+        .exchange-card.fastest::after {
+            content: 'FASTEST';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 0.55rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--green);
+            padding: 2px 6px;
+            background: var(--green-dim);
+            border-radius: 3px;
+        }
+
+        .exchange-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .exchange-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .exchange-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--bg-primary);
+        }
+
+        .exchange-name-group {
             display: flex;
             flex-direction: column;
-            gap: 20px;
         }
 
-        .polymarket-loading {
-            text-align: center;
-            color: #8892b0;
-            padding: 40px;
+        .exchange-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
         }
 
-        .polymarket-market {
-            background: rgba(168, 85, 247, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid rgba(168, 85, 247, 0.2);
-        }
-
-        .polymarket-header {
+        .exchange-status {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 10px;
+            gap: 4px;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 2px;
         }
 
-        .polymarket-question {
-            font-size: 1.1rem;
-            color: #fff;
-            flex: 1;
+        .exchange-status-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--text-muted);
         }
 
-        .polymarket-timer {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            color: #f39c12;
+        .exchange-status-dot.connected {
+            background: var(--green);
+        }
+
+        .exchange-status-dot.connecting {
+            background: var(--amber);
+        }
+
+        .exchange-status-dot.error {
+            background: var(--red);
+        }
+
+        .exchange-price {
+            text-align: right;
+        }
+
+        .exchange-current-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.25rem;
             font-weight: 600;
+            color: var(--text-primary);
         }
 
-        .polymarket-timer.urgent {
-            background: rgba(231, 76, 60, 0.3);
-            color: #e74c3c;
-            animation: pulse 1s infinite;
+        .exchange-current-price.up {
+            color: var(--green);
         }
 
-        .polymarket-prices {
+        .exchange-current-price.down {
+            color: var(--red);
+        }
+
+        .exchange-change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .exchange-change.positive {
+            color: var(--green);
+        }
+
+        .exchange-change.negative {
+            color: var(--red);
+        }
+
+        .chart-container {
+            height: 80px;
+            margin: 8px -4px;
+        }
+
+        .exchange-stats {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
         }
 
-        .price-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            padding: 20px;
+        .exchange-stat {
             text-align: center;
-            transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .price-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        .exchange-stat-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
         }
 
-        .price-card.up {
-            border: 2px solid rgba(46, 204, 113, 0.5);
+        .exchange-stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
         }
 
-        .price-card.down {
-            border: 2px solid rgba(231, 76, 60, 0.5);
-        }
-
-        .price-card-label {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-
-        .price-card.up .price-card-label {
-            color: #2ecc71;
-        }
-
-        .price-card.down .price-card-label {
-            color: #e74c3c;
-        }
-
-        .price-card-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-
-        .price-card.up .price-card-value {
-            color: #2ecc71;
-        }
-
-        .price-card.down .price-card-value {
-            color: #e74c3c;
-        }
-
-        .price-card-cents {
-            font-size: 0.9rem;
-            color: #8892b0;
-        }
-
-        .polymarket-info {
+        /* ===== LOADING STATE ===== */
+        .loading-state {
             display: flex;
-            justify-content: space-between;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-muted);
             font-size: 0.85rem;
-            color: #8892b0;
-            flex-wrap: wrap;
-            gap: 10px;
         }
 
-        .polymarket-status {
-            display: flex;
+        /* ===== MISPRICING INDICATOR ===== */
+        .mispricing-alert {
+            display: none;
             align-items: center;
             gap: 8px;
+            padding: 8px 12px;
+            background: var(--amber-dim);
+            border: 1px solid var(--amber);
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 0.75rem;
+            color: var(--amber);
         }
 
-        .polymarket-status .status-dot {
-            width: 8px;
-            height: 8px;
+        .mispricing-alert.show {
+            display: flex;
         }
 
-        .polymarket-price-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
+        .mispricing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--amber);
         }
 
-        .polymarket-strike,
-        .polymarket-current {
-            text-align: center;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1200px) {
+            .exchange-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
-        .polymarket-strike {
-            border: 1px solid rgba(255, 184, 0, 0.3);
-        }
-
-        .polymarket-current {
-            border: 1px solid rgba(100, 255, 218, 0.3);
-        }
-
-        .strike-label,
-        .reference-label {
-            font-size: 0.85rem;
-            color: #8892b0;
-            margin-bottom: 8px;
-        }
-
-        .strike-price {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #ffb800;
-        }
-
-        .reference-price {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #64ffda;
-        }
-
-        .price-diff {
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-top: 5px;
-        }
-
-        .price-diff.positive {
-            color: #2ecc71;
-        }
-
-        .price-diff.negative {
-            color: #e74c3c;
-        }
-
-        @media (max-width: 600px) {
-            .header h1 {
-                font-size: 1.8rem;
+        @media (max-width: 800px) {
+            .metrics-bar {
+                grid-template-columns: repeat(2, 1fr);
             }
 
-            .grid {
+            .exchange-grid {
                 grid-template-columns: 1fr;
             }
 
-            .current-price {
-                font-size: 1.4rem;
+            .header {
+                padding: 16px 20px;
             }
 
-            .polymarket-price-row {
-                grid-template-columns: 1fr;
-            }
-
-            .polymarket-prices {
-                grid-template-columns: 1fr;
-            }
-
-            .price-card-value {
-                font-size: 2rem;
-            }
-
-            .strike-price,
-            .reference-price {
-                font-size: 1.5rem;
+            .main {
+                padding: 20px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>₿ Live Bitcoin Monitor</h1>
-        <p>Real-time prices from multiple exchanges via WebSocket</p>
-    </div>
-
-    <div class="status-bar" id="statusBar">
-        <!-- Status indicators will be dynamically added -->
-    </div>
-
-    <div class="spread-indicator">
-        <h2>📊 Cross-Exchange Spread Analysis</h2>
-        <div class="spread-grid" id="spreadGrid">
-            <div class="spread-item">
-                <div class="spread-label">Highest Price</div>
-                <div class="spread-value" id="highestPrice">--</div>
-                <div class="spread-label" id="highestExchange">--</div>
-            </div>
-            <div class="spread-item">
-                <div class="spread-label">Lowest Price</div>
-                <div class="spread-value" id="lowestPrice">--</div>
-                <div class="spread-label" id="lowestExchange">--</div>
-            </div>
-            <div class="spread-item">
-                <div class="spread-label">Spread</div>
-                <div class="spread-value" id="spreadValue">--</div>
-                <div class="spread-label">Arbitrage Opportunity</div>
-            </div>
-            <div class="spread-item">
-                <div class="spread-label">Average Price</div>
-                <div class="spread-value" id="avgPrice">--</div>
-                <div class="spread-label">Across All Exchanges</div>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo"><span>BTC</span> Monitor</div>
+            <div class="connection-status">
+                <div class="connection-dot" id="globalConnectionDot"></div>
+                <span id="connectionCount">0/6 feeds</span>
             </div>
         </div>
-    </div>
-
-    <div class="comparison-section">
-        <h2>📈 All Exchanges Comparison</h2>
-        <div class="comparison-chart-container">
-            <canvas id="comparisonChart"></canvas>
+        <div class="header-timer" id="headerTimer">
+            <span class="header-timer-label">Window Closes</span>
+            <span class="header-timer-value" id="headerTimerValue">--:--</span>
         </div>
-    </div>
+    </header>
 
-    <div class="grid" id="exchangeGrid">
-        <!-- Exchange cards will be dynamically added -->
-    </div>
-
-    <div class="polymarket-section">
-        <h2>🎯 Polymarket 15-Min BTC Prediction</h2>
-        <div class="polymarket-container" id="polymarketContainer">
-            <div class="polymarket-loading">Loading current market...</div>
+    <!-- MAIN CONTENT -->
+    <main class="main">
+        <!-- KEY METRICS BAR -->
+        <div class="metrics-bar">
+            <div class="metric-card">
+                <div class="metric-label">Strike Price</div>
+                <div class="metric-value amber" id="metricStrike">--</div>
+                <div class="metric-sub">at window open</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Current Price</div>
+                <div class="metric-value" id="metricCurrent">--</div>
+                <div class="metric-sub" id="metricCurrentSub">live average</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Difference</div>
+                <div class="metric-value" id="metricDiff">--</div>
+                <div class="metric-sub" id="metricDiffPercent">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Time Remaining</div>
+                <div class="metric-value" id="metricTimer">--:--</div>
+                <div class="metric-sub" id="metricTimerSub">until close</div>
+            </div>
         </div>
-    </div>
 
-    <div class="footer">
-        <p>Data streams via WebSocket connections • Prices update in real-time</p>
-    </div>
+        <!-- POLYMARKET SECTION -->
+        <div class="polymarket-section" id="polymarketSection">
+            <div class="poly-header">
+                <div class="poly-title">Polymarket 15-Min Prediction</div>
+                <div class="poly-status">
+                    <div class="poly-status-dot connecting" id="polyStatusDot"></div>
+                    <span id="polyStatusText">Connecting...</span>
+                </div>
+            </div>
+
+            <!-- Mispricing Alert -->
+            <div class="mispricing-alert" id="mispricingAlert">
+                <div class="mispricing-dot"></div>
+                <span>Potential mispricing detected - odds may not reflect price movement</span>
+            </div>
+
+            <!-- Probability Bar -->
+            <div class="probability-container">
+                <div class="probability-labels">
+                    <div class="prob-label">
+                        <span class="prob-direction up">UP</span>
+                        <span class="prob-percent up" id="probUpPercent">50%</span>
+                    </div>
+                    <div class="prob-label">
+                        <span class="prob-percent down" id="probDownPercent">50%</span>
+                        <span class="prob-direction down">DOWN</span>
+                    </div>
+                </div>
+                <div class="probability-bar">
+                    <div class="prob-bar-up" id="probBarUp" style="width: 50%;">
+                        <span class="prob-bar-text" id="probBarUpText">50%</span>
+                    </div>
+                    <div class="prob-bar-down" id="probBarDown">
+                        <span class="prob-bar-text" id="probBarDownText">50%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bid/Ask -->
+            <div class="bidask-row">
+                <div class="bidask-item">
+                    <span class="bidask-label">UP Bid/Ask</span>
+                    <span class="bidask-value" id="bidAskUp">-- / --</span>
+                </div>
+                <div class="bidask-item">
+                    <span class="bidask-label">DOWN Bid/Ask</span>
+                    <span class="bidask-value" id="bidAskDown">-- / --</span>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="poly-footer">
+                <span id="polyWindowInfo">Loading window info...</span>
+                <span class="new-window-badge" id="newWindowBadge">New Window</span>
+            </div>
+        </div>
+
+        <!-- EXCHANGE GRID -->
+        <div class="exchange-grid" id="exchangeGrid">
+            <!-- Exchange cards will be dynamically added -->
+        </div>
+    </main>
 
     <script>
         // Exchange configurations
@@ -564,6 +714,7 @@
                 name: 'Binance',
                 color: '#F3BA2F',
                 ws: 'wss://stream.binance.com:9443/ws/btcusdt@trade',
+                fastest: true,
                 parseMessage: (data) => {
                     const msg = JSON.parse(data);
                     if (msg.e === 'trade') {
@@ -612,7 +763,7 @@
             },
             bitstamp: {
                 name: 'Bitstamp',
-                color: '#2ECC71',
+                color: '#009C3E',
                 ws: 'wss://ws.bitstamp.net',
                 subscribe: JSON.stringify({
                     event: 'bts:subscribe',
@@ -665,8 +816,7 @@
         // State management
         const state = {};
         const charts = {};
-        const MAX_DATA_POINTS = 100;
-        let comparisonChart = null;
+        const MAX_DATA_POINTS = 60;
 
         // Initialize exchange state
         Object.keys(exchanges).forEach(key => {
@@ -684,56 +834,48 @@
             };
         });
 
-        // Create status bar
-        function createStatusBar() {
-            const statusBar = document.getElementById('statusBar');
-            Object.keys(exchanges).forEach(key => {
-                const item = document.createElement('div');
-                item.className = 'status-item';
-                item.innerHTML = `
-                    <div class="status-dot connecting" id="status-${key}"></div>
-                    <span>${exchanges[key].name}</span>
-                `;
-                statusBar.appendChild(item);
-            });
-        }
-
         // Create exchange cards
         function createExchangeCards() {
             const grid = document.getElementById('exchangeGrid');
             Object.keys(exchanges).forEach(key => {
                 const exchange = exchanges[key];
                 const card = document.createElement('div');
-                card.className = 'card';
+                card.className = `exchange-card${exchange.fastest ? ' fastest' : ''}`;
                 card.id = `card-${key}`;
                 card.innerHTML = `
-                    <div class="card-header">
-                        <div class="exchange-name">
-                            <div class="exchange-logo" style="background: ${exchange.color}20; color: ${exchange.color}">
+                    <div class="exchange-header">
+                        <div class="exchange-info">
+                            <div class="exchange-icon" style="background: ${exchange.color}">
                                 ${exchange.name.charAt(0)}
                             </div>
-                            ${exchange.name}
+                            <div class="exchange-name-group">
+                                <span class="exchange-name">${exchange.name}</span>
+                                <div class="exchange-status">
+                                    <div class="exchange-status-dot connecting" id="status-${key}"></div>
+                                    <span id="status-text-${key}">Connecting</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="price-display">
-                            <div class="current-price" id="price-${key}">Connecting...</div>
-                            <div class="price-change" id="change-${key}">--</div>
+                        <div class="exchange-price">
+                            <div class="exchange-current-price" id="price-${key}">--</div>
+                            <div class="exchange-change" id="change-${key}">--</div>
                         </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="chart-${key}"></canvas>
                     </div>
-                    <div class="stats">
-                        <div class="stat">
-                            <div class="stat-label">High</div>
-                            <div class="stat-value" id="high-${key}">--</div>
+                    <div class="exchange-stats">
+                        <div class="exchange-stat">
+                            <div class="exchange-stat-label">High</div>
+                            <div class="exchange-stat-value" id="high-${key}">--</div>
                         </div>
-                        <div class="stat">
-                            <div class="stat-label">Low</div>
-                            <div class="stat-value" id="low-${key}">--</div>
+                        <div class="exchange-stat">
+                            <div class="exchange-stat-label">Low</div>
+                            <div class="exchange-stat-value" id="low-${key}">--</div>
                         </div>
-                        <div class="stat">
-                            <div class="stat-label">Volume</div>
-                            <div class="stat-value" id="volume-${key}">--</div>
+                        <div class="exchange-stat">
+                            <div class="exchange-stat-label">Vol</div>
+                            <div class="exchange-stat-value" id="volume-${key}">--</div>
                         </div>
                     </div>
                 `;
@@ -741,7 +883,7 @@
             });
         }
 
-        // Initialize charts
+        // Initialize charts with minimal sparkline style
         function initCharts() {
             Object.keys(exchanges).forEach(key => {
                 const ctx = document.getElementById(`chart-${key}`).getContext('2d');
@@ -750,131 +892,71 @@
                     data: {
                         labels: [],
                         datasets: [{
-                            label: 'Price',
                             data: [],
-                            borderColor: exchanges[key].color,
-                            backgroundColor: `${exchanges[key].color}20`,
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.4,
+                            borderColor: '#444444',
+                            backgroundColor: 'transparent',
+                            borderWidth: 1.5,
+                            fill: false,
+                            tension: 0.3,
                             pointRadius: 0,
-                            pointHoverRadius: 4
+                            pointHoverRadius: 0
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        animation: { duration: 0 },
-                        interaction: {
-                            intersect: false,
-                            mode: 'index'
-                        },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                backgroundColor: 'rgba(0,0,0,0.8)',
-                                titleColor: '#fff',
-                                bodyColor: '#fff',
-                                callbacks: {
-                                    label: (ctx) => `$${ctx.raw.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                                }
-                            }
-                        },
+                        animation: false,
+                        interaction: { enabled: false },
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
                         scales: {
-                            x: {
-                                display: false
-                            },
+                            x: { display: false },
                             y: {
-                                display: true,
-                                grid: {
-                                    color: 'rgba(255,255,255,0.05)'
-                                },
-                                ticks: {
-                                    color: '#8892b0',
-                                    font: { size: 10 },
-                                    callback: (val) => '$' + val.toLocaleString()
+                                display: false,
+                                grace: '5%',
+                                afterDataLimits: (scale) => {
+                                    const range = scale.max - scale.min;
+                                    const minRange = 30;
+                                    if (range < minRange) {
+                                        const mid = (scale.max + scale.min) / 2;
+                                        scale.min = mid - minRange / 2;
+                                        scale.max = mid + minRange / 2;
+                                    }
                                 }
                             }
                         }
                     }
                 });
             });
-
-            // Initialize comparison chart
-            const compCtx = document.getElementById('comparisonChart').getContext('2d');
-            const datasets = Object.keys(exchanges).map(key => ({
-                label: exchanges[key].name,
-                data: [],
-                borderColor: exchanges[key].color,
-                backgroundColor: 'transparent',
-                borderWidth: 2,
-                tension: 0.4,
-                pointRadius: 0,
-                pointHoverRadius: 4
-            }));
-
-            comparisonChart = new Chart(compCtx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 0 },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: '#fff',
-                                usePointStyle: true,
-                                padding: 20
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0,0,0,0.9)',
-                            titleColor: '#fff',
-                            bodyColor: '#fff',
-                            callbacks: {
-                                label: (ctx) => `${ctx.dataset.label}: $${ctx.raw?.toLocaleString('en-US', { minimumFractionDigits: 2 }) || '--'}`
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            display: true,
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: {
-                                color: '#8892b0',
-                                maxTicksLimit: 10,
-                                font: { size: 10 }
-                            }
-                        },
-                        y: {
-                            display: true,
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: {
-                                color: '#8892b0',
-                                font: { size: 11 },
-                                callback: (val) => '$' + val.toLocaleString()
-                            }
-                        }
-                    }
-                }
-            });
         }
 
         // Update status indicator
         function updateStatus(exchange, status) {
             const dot = document.getElementById(`status-${exchange}`);
-            dot.className = `status-dot ${status}`;
+            const text = document.getElementById(`status-text-${exchange}`);
+            if (dot) {
+                dot.className = `exchange-status-dot ${status}`;
+            }
+            if (text) {
+                text.textContent = status === 'connected' ? 'Live' : status === 'connecting' ? 'Connecting' : 'Error';
+            }
             state[exchange].status = status;
+            updateConnectionCount();
+        }
+
+        // Update global connection count
+        function updateConnectionCount() {
+            const connected = Object.keys(exchanges).filter(k => state[k].status === 'connected').length;
+            const total = Object.keys(exchanges).length;
+            document.getElementById('connectionCount').textContent = `${connected}/${total} feeds`;
+            const dot = document.getElementById('globalConnectionDot');
+            if (connected === total) {
+                dot.className = 'connection-dot live';
+            } else if (connected > 0) {
+                dot.className = 'connection-dot';
+                dot.style.background = '#F59E0B';
+            } else {
+                dot.className = 'connection-dot';
+            }
         }
 
         // Update UI for an exchange
@@ -882,13 +964,12 @@
             const s = state[key];
             if (!s.currentPrice) return;
 
-            // Update price display
             const priceEl = document.getElementById(`price-${key}`);
             priceEl.textContent = `$${s.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-            // Flash color based on price movement
+            // Color based on movement
+            priceEl.classList.remove('up', 'down');
             if (s.previousPrice) {
-                priceEl.classList.remove('up', 'down');
                 if (s.currentPrice > s.previousPrice) {
                     priceEl.classList.add('up');
                 } else if (s.currentPrice < s.previousPrice) {
@@ -896,84 +977,31 @@
                 }
             }
 
-            // Update change indicator
+            // Update change
             if (s.prices.length > 1) {
                 const firstPrice = s.prices[0];
                 const change = ((s.currentPrice - firstPrice) / firstPrice) * 100;
                 const changeEl = document.getElementById(`change-${key}`);
                 changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(3)}%`;
-                changeEl.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+                changeEl.className = `exchange-change ${change >= 0 ? 'positive' : 'negative'}`;
             }
 
-            // Update stats
-            document.getElementById(`high-${key}`).textContent = s.high ? `$${s.high.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '--';
-            document.getElementById(`low-${key}`).textContent = s.low ? `$${s.low.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '--';
-            document.getElementById(`volume-${key}`).textContent = s.volume ? s.volume.toFixed(4) + ' BTC' : '--';
+            // Stats
+            document.getElementById(`high-${key}`).textContent = s.high ? `$${s.high.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '--';
+            document.getElementById(`low-${key}`).textContent = s.low ? `$${s.low.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '--';
+            document.getElementById(`volume-${key}`).textContent = s.volume ? s.volume.toFixed(2) : '--';
 
-            // Update individual chart
+            // Chart
             const chart = charts[key];
             chart.data.labels = s.timestamps.map(t => t.toLocaleTimeString());
             chart.data.datasets[0].data = [...s.prices];
+
+            // Color line based on overall direction
+            const firstP = s.prices[0];
+            const lastP = s.prices[s.prices.length - 1];
+            chart.data.datasets[0].borderColor = lastP > firstP ? '#00C805' : lastP < firstP ? '#FF5000' : '#444444';
+
             chart.update('none');
-        }
-
-        // Update comparison chart
-        function updateComparisonChart() {
-            // Find the longest timestamp array
-            let maxLen = 0;
-            let timestamps = [];
-            Object.keys(exchanges).forEach(key => {
-                if (state[key].timestamps.length > maxLen) {
-                    maxLen = state[key].timestamps.length;
-                    timestamps = state[key].timestamps;
-                }
-            });
-
-            comparisonChart.data.labels = timestamps.map(t => t.toLocaleTimeString());
-
-            Object.keys(exchanges).forEach((key, index) => {
-                // Pad shorter arrays with null
-                const prices = [...state[key].prices];
-                while (prices.length < maxLen) {
-                    prices.unshift(null);
-                }
-                comparisonChart.data.datasets[index].data = prices;
-            });
-
-            comparisonChart.update('none');
-        }
-
-        // Update spread analysis
-        function updateSpreadAnalysis() {
-            const prices = {};
-            Object.keys(exchanges).forEach(key => {
-                if (state[key].currentPrice) {
-                    prices[key] = state[key].currentPrice;
-                }
-            });
-
-            const priceValues = Object.values(prices);
-            if (priceValues.length < 2) return;
-
-            const highest = Math.max(...priceValues);
-            const lowest = Math.min(...priceValues);
-            const spread = highest - lowest;
-            const avg = priceValues.reduce((a, b) => a + b, 0) / priceValues.length;
-
-            const highestExchange = Object.keys(prices).find(k => prices[k] === highest);
-            const lowestExchange = Object.keys(prices).find(k => prices[k] === lowest);
-
-            document.getElementById('highestPrice').textContent = `$${highest.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-            document.getElementById('highestExchange').textContent = exchanges[highestExchange].name;
-
-            document.getElementById('lowestPrice').textContent = `$${lowest.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-            document.getElementById('lowestExchange').textContent = exchanges[lowestExchange].name;
-
-            const spreadEl = document.getElementById('spreadValue');
-            spreadEl.textContent = `$${spread.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-            spreadEl.className = `spread-value ${spread > 50 ? 'positive' : ''}`;
-
-            document.getElementById('avgPrice').textContent = `$${avg.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
         }
 
         // Connect to WebSocket
@@ -982,17 +1010,13 @@
             const s = state[key];
 
             try {
-                console.log(`Connecting to ${exchange.name}...`);
                 updateStatus(key, 'connecting');
-
                 const ws = new WebSocket(exchange.ws);
                 s.ws = ws;
 
                 ws.onopen = () => {
-                    console.log(`Connected to ${exchange.name}`);
                     updateStatus(key, 'connected');
                     s.reconnectAttempts = 0;
-
                     if (exchange.subscribe) {
                         ws.send(exchange.subscribe);
                     }
@@ -1005,53 +1029,90 @@
                             s.previousPrice = s.currentPrice;
                             s.currentPrice = result.price;
 
-                            // Update price history
                             const now = new Date();
                             s.prices.push(result.price);
                             s.timestamps.push(now);
 
-                            // Keep only last MAX_DATA_POINTS
                             if (s.prices.length > MAX_DATA_POINTS) {
                                 s.prices.shift();
                                 s.timestamps.shift();
                             }
 
-                            // Update high/low
                             if (!s.high || result.price > s.high) s.high = result.price;
                             if (!s.low || result.price < s.low) s.low = result.price;
-
-                            // Update volume
                             if (result.volume) s.volume += result.volume;
 
-                            // Update UI
                             updateExchangeUI(key);
-                            updateComparisonChart();
-                            updateSpreadAnalysis();
+                            updateMetrics();
                         }
-                    } catch (e) {
-                        console.error(`Parse error for ${exchange.name}:`, e);
-                    }
+                    } catch (e) {}
                 };
 
-                ws.onerror = (error) => {
-                    console.error(`WebSocket error for ${exchange.name}:`, error);
-                    updateStatus(key, 'error');
-                };
+                ws.onerror = () => updateStatus(key, 'error');
 
                 ws.onclose = () => {
-                    console.log(`Connection closed for ${exchange.name}`);
                     updateStatus(key, 'error');
-
-                    // Reconnect with exponential backoff
                     s.reconnectAttempts++;
                     const delay = Math.min(1000 * Math.pow(2, s.reconnectAttempts), 30000);
-                    console.log(`Reconnecting to ${exchange.name} in ${delay}ms...`);
                     setTimeout(() => connectWebSocket(key), delay);
                 };
 
             } catch (error) {
-                console.error(`Failed to connect to ${exchange.name}:`, error);
                 updateStatus(key, 'error');
+            }
+        }
+
+        // Update key metrics bar
+        function updateMetrics() {
+            const avgPrice = getAverageBtcPrice();
+            if (!avgPrice) return;
+
+            // Current price
+            const currentEl = document.getElementById('metricCurrent');
+            currentEl.textContent = `$${avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            // Difference from strike
+            if (polymarketState.strikePrice) {
+                const diff = avgPrice - polymarketState.strikePrice;
+                const diffPercent = (diff / polymarketState.strikePrice) * 100;
+                const sign = diff >= 0 ? '+' : '';
+
+                const diffEl = document.getElementById('metricDiff');
+                const diffPercentEl = document.getElementById('metricDiffPercent');
+
+                diffEl.textContent = `${sign}$${Math.abs(diff).toFixed(2)}`;
+                diffEl.className = `metric-value ${diff >= 0 ? 'up' : 'down'}`;
+
+                diffPercentEl.textContent = `${sign}${diffPercent.toFixed(3)}%`;
+                diffPercentEl.className = `metric-sub ${diff >= 0 ? 'up' : 'down'}`;
+
+                // Update current price color too
+                currentEl.className = `metric-value ${diff >= 0 ? 'up' : 'down'}`;
+
+                // Check for mispricing
+                checkMispricing(diff);
+            }
+        }
+
+        // Check for mispricing (odds vs price direction divergence)
+        function checkMispricing(priceDiff) {
+            const alert = document.getElementById('mispricingAlert');
+            const section = document.getElementById('polymarketSection');
+
+            // Price is UP but DOWN odds are higher, or vice versa
+            const priceUp = priceDiff > 0;
+            const oddsUp = polymarketState.priceUp > polymarketState.priceDown;
+
+            // Only show alert if significant divergence (>5% difference in odds from expected)
+            const expectedOdds = priceUp ? polymarketState.priceUp : polymarketState.priceDown;
+            const threshold = 0.45; // If expected direction has less than 45% odds, flag it
+
+            if ((priceUp && polymarketState.priceUp < threshold) || (!priceUp && polymarketState.priceDown < threshold)) {
+                alert.classList.add('show');
+                section.classList.add('mispricing');
+            } else {
+                alert.classList.remove('show');
+                section.classList.remove('mispricing');
             }
         }
 
@@ -1059,7 +1120,6 @@
         // POLYMARKET 15-MIN BTC PREDICTION MARKET
         // ============================================
 
-        // Use local proxy to avoid CORS issues
         const GAMMA_API = '/api/gamma';
         const CLOB_API = '/api/clob';
         const CLOB_WSS = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
@@ -1079,28 +1139,23 @@
             endTime: null,
             startTime: null,
             question: '',
-            fetching: false,  // Prevent multiple fetches
-            strikePrice: null,  // BTC price at window start
-            strikeCaptured: false  // Flag to capture strike once
+            fetching: false,
+            strikePrice: null,
+            strikeCaptured: false
         };
 
-        // Get current 15-min window timestamp
         function get15MinTimestamp() {
             const now = Math.floor(Date.now() / 1000);
             return Math.floor(now / 900) * 900;
         }
 
-        // Fetch the current BTC 15-min market
         async function fetchPolymarketMarket() {
-            // Prevent multiple simultaneous fetches
             if (polymarketState.fetching) return;
             polymarketState.fetching = true;
 
-            const container = document.getElementById('polymarketContainer');
             const timestamps = [];
             const baseTs = get15MinTimestamp();
 
-            // Check current and next 3 windows
             for (let i = 0; i < 4; i++) {
                 timestamps.push(baseTs + (i * 900));
             }
@@ -1109,7 +1164,6 @@
                 const slug = `btc-updown-15m-${ts}`;
 
                 try {
-                    // Fetch from Gamma API
                     const gammaResp = await fetch(`${GAMMA_API}/events?slug=${slug}`);
                     if (!gammaResp.ok) continue;
 
@@ -1123,7 +1177,6 @@
                     const endTime = new Date(endDate);
                     if (endTime <= new Date()) continue;
 
-                    // Get condition ID
                     let conditionId = null;
                     for (const m of (event.markets || [])) {
                         if (m.conditionId) {
@@ -1133,14 +1186,12 @@
                     }
                     if (!conditionId) continue;
 
-                    // Fetch from CLOB API
                     const clobResp = await fetch(`${CLOB_API}/markets/${conditionId}`);
                     if (!clobResp.ok) continue;
 
                     const clobData = await clobResp.json();
                     if (!clobData.active || clobData.closed) continue;
 
-                    // Extract token IDs
                     let tokenUp = null, tokenDown = null;
                     let priceUp = 0.5, priceDown = 0.5;
 
@@ -1157,47 +1208,36 @@
 
                     if (!tokenUp || !tokenDown) continue;
 
-                    // Found a valid market!
                     polymarketState.market = conditionId;
                     polymarketState.tokenUp = tokenUp;
                     polymarketState.tokenDown = tokenDown;
                     polymarketState.priceUp = priceUp;
                     polymarketState.priceDown = priceDown;
                     polymarketState.endTime = endTime;
-                    polymarketState.startTime = new Date(endTime.getTime() - 15 * 60 * 1000); // 15 min before end
+                    polymarketState.startTime = new Date(endTime.getTime() - 15 * 60 * 1000);
                     polymarketState.question = clobData.question || `BTC Up/Down by ${endTime.toLocaleTimeString()}`;
 
-                    // Capture strike price (current avg price when we discover the market)
                     const avgPrice = getAverageBtcPrice();
                     if (avgPrice && !polymarketState.strikeCaptured) {
                         polymarketState.strikePrice = avgPrice;
                         polymarketState.strikeCaptured = true;
-                        console.log('Strike price captured:', polymarketState.strikePrice);
+                        document.getElementById('metricStrike').textContent = `$${avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     }
 
-                    console.log('Found Polymarket BTC market:', polymarketState.question);
                     polymarketState.fetching = false;
-                    renderPolymarketUI();
+                    updatePolymarketUI();
                     connectPolymarketWS();
                     return;
 
                 } catch (e) {
-                    console.error('Error fetching market for slug', slug, e);
                     continue;
                 }
             }
 
-            // No market found
             polymarketState.fetching = false;
-            container.innerHTML = `
-                <div class="polymarket-loading">
-                    No active BTC 15-min market found. Retrying...
-                </div>
-            `;
             setTimeout(fetchPolymarketMarket, 5000);
         }
 
-        // Get average BTC price from connected exchanges
         function getAverageBtcPrice() {
             const prices = [];
             Object.keys(exchanges).forEach(key => {
@@ -1209,102 +1249,49 @@
             return prices.reduce((a, b) => a + b, 0) / prices.length;
         }
 
-        // Render Polymarket UI
-        function renderPolymarketUI() {
-            const container = document.getElementById('polymarketContainer');
-            const strikeDisplay = polymarketState.strikePrice
-                ? `$${polymarketState.strikePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : 'Capturing...';
+        function updatePolymarketUI() {
+            // Update probability bar
+            const upPercent = Math.round(polymarketState.priceUp * 100);
+            const downPercent = Math.round(polymarketState.priceDown * 100);
 
-            container.innerHTML = `
-                <div class="polymarket-market">
-                    <div class="polymarket-header">
-                        <div class="polymarket-question">${polymarketState.question}</div>
-                        <div class="polymarket-timer" id="polyTimer">--:--</div>
-                    </div>
-                    <div class="polymarket-price-row">
-                        <div class="polymarket-strike">
-                            <div class="strike-label">Strike Price (Window Start)</div>
-                            <div class="strike-price" id="polyStrikePrice">${strikeDisplay}</div>
-                        </div>
-                        <div class="polymarket-current">
-                            <div class="reference-label">Current Price (Live)</div>
-                            <div class="reference-price" id="polyRefPrice">Loading...</div>
-                            <div class="price-diff" id="polyPriceDiff">--</div>
-                        </div>
-                    </div>
-                    <div class="polymarket-prices">
-                        <div class="price-card up">
-                            <div class="price-card-label">📈 UP</div>
-                            <div class="price-card-value" id="polyPriceUp">${(polymarketState.priceUp * 100).toFixed(1)}¢</div>
-                            <div class="price-card-cents" id="polyBidAskUp">Loading orderbook...</div>
-                        </div>
-                        <div class="price-card down">
-                            <div class="price-card-label">📉 DOWN</div>
-                            <div class="price-card-value" id="polyPriceDown">${(polymarketState.priceDown * 100).toFixed(1)}¢</div>
-                            <div class="price-card-cents" id="polyBidAskDown">Loading orderbook...</div>
-                        </div>
-                    </div>
-                    <div class="polymarket-info">
-                        <div class="polymarket-status">
-                            <div class="status-dot connecting" id="polyStatus"></div>
-                            <span id="polyStatusText">Connecting to orderbook...</span>
-                        </div>
-                        <div>Window: ${polymarketState.startTime.toLocaleTimeString()} - ${polymarketState.endTime.toLocaleTimeString()}</div>
-                    </div>
-                </div>
-            `;
-            updatePolymarketTimer();
-            updatePolymarketRefPrice();
-        }
+            document.getElementById('probUpPercent').textContent = `${upPercent}%`;
+            document.getElementById('probDownPercent').textContent = `${downPercent}%`;
+            document.getElementById('probBarUp').style.width = `${upPercent}%`;
+            document.getElementById('probBarUpText').textContent = `${upPercent}%`;
+            document.getElementById('probBarDownText').textContent = `${downPercent}%`;
 
-        // Update reference price display
-        function updatePolymarketRefPrice() {
-            const refPriceEl = document.getElementById('polyRefPrice');
-            const diffEl = document.getElementById('polyPriceDiff');
-            const strikeEl = document.getElementById('polyStrikePrice');
-            if (!refPriceEl) return;
+            // Update bid/ask
+            if (polymarketState.bidUp !== null && polymarketState.askUp !== null) {
+                document.getElementById('bidAskUp').textContent = `${(polymarketState.bidUp * 100).toFixed(1)}¢ / ${(polymarketState.askUp * 100).toFixed(1)}¢`;
+            }
+            if (polymarketState.bidDown !== null && polymarketState.askDown !== null) {
+                document.getElementById('bidAskDown').textContent = `${(polymarketState.bidDown * 100).toFixed(1)}¢ / ${(polymarketState.askDown * 100).toFixed(1)}¢`;
+            }
 
-            const avgPrice = getAverageBtcPrice();
-            if (avgPrice) {
-                refPriceEl.textContent = `$${avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-                // Update strike price if not captured yet
-                if (!polymarketState.strikeCaptured && polymarketState.market) {
-                    polymarketState.strikePrice = avgPrice;
-                    polymarketState.strikeCaptured = true;
-                    if (strikeEl) {
-                        strikeEl.textContent = `$${avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                    }
-                }
-
-                // Show price difference from strike
-                if (diffEl && polymarketState.strikePrice) {
-                    const diff = avgPrice - polymarketState.strikePrice;
-                    const diffPercent = (diff / polymarketState.strikePrice) * 100;
-                    const sign = diff >= 0 ? '+' : '';
-                    diffEl.textContent = `${sign}$${diff.toFixed(2)} (${sign}${diffPercent.toFixed(3)}%)`;
-                    diffEl.className = `price-diff ${diff >= 0 ? 'positive' : 'negative'}`;
-                }
-            } else {
-                refPriceEl.textContent = 'Waiting for data...';
+            // Update window info
+            if (polymarketState.startTime && polymarketState.endTime) {
+                document.getElementById('polyWindowInfo').textContent =
+                    `Window: ${polymarketState.startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${polymarketState.endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
             }
         }
 
-        // Update countdown timer
         function updatePolymarketTimer() {
             if (!polymarketState.endTime) return;
-
-            const timerEl = document.getElementById('polyTimer');
-            if (!timerEl) return;
 
             const now = new Date();
             const diff = polymarketState.endTime - now;
 
             if (diff <= 0) {
-                timerEl.textContent = 'EXPIRED';
-                timerEl.classList.add('urgent');
-                // Close existing WebSocket and reset state
+                document.getElementById('headerTimerValue').textContent = 'CLOSED';
+                document.getElementById('metricTimer').textContent = 'CLOSED';
+                document.getElementById('headerTimer').classList.add('urgent');
+
+                // Show new window badge
+                const badge = document.getElementById('newWindowBadge');
+                badge.classList.add('show');
+                setTimeout(() => badge.classList.remove('show'), 3000);
+
+                // Reset and fetch new market
                 if (polymarketState.ws) {
                     polymarketState.ws.close();
                     polymarketState.ws = null;
@@ -1316,23 +1303,32 @@
                 polymarketState.askDown = null;
                 polymarketState.strikePrice = null;
                 polymarketState.strikeCaptured = false;
-                // Fetch new market
+                document.getElementById('metricStrike').textContent = '--';
+                document.getElementById('metricDiff').textContent = '--';
+                document.getElementById('metricDiff').className = 'metric-value';
+                document.getElementById('metricDiffPercent').textContent = '--';
+                document.getElementById('metricDiffPercent').className = 'metric-sub';
+
                 setTimeout(fetchPolymarketMarket, 2000);
                 return;
             }
 
             const mins = Math.floor(diff / 60000);
             const secs = Math.floor((diff % 60000) / 1000);
-            timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+            document.getElementById('headerTimerValue').textContent = timeStr;
+            document.getElementById('metricTimer').textContent = timeStr;
 
             if (diff < 60000) {
-                timerEl.classList.add('urgent');
+                document.getElementById('headerTimer').classList.add('urgent');
+                document.getElementById('metricTimer').classList.add('down');
             } else {
-                timerEl.classList.remove('urgent');
+                document.getElementById('headerTimer').classList.remove('urgent');
+                document.getElementById('metricTimer').classList.remove('down');
             }
         }
 
-        // Connect to Polymarket WebSocket
         function connectPolymarketWS() {
             if (polymarketState.ws) {
                 polymarketState.ws.close();
@@ -1343,11 +1339,9 @@
                 polymarketState.ws = ws;
 
                 ws.onopen = () => {
-                    console.log('Connected to Polymarket CLOB WSS');
                     polymarketState.status = 'connected';
-                    updatePolymarketStatus('connected', 'Live orderbook data');
+                    updatePolymarketStatus('connected', 'Live');
 
-                    // Subscribe to both tokens
                     const subMsg = {
                         assets_ids: [polymarketState.tokenUp, polymarketState.tokenDown],
                         type: 'market'
@@ -1359,22 +1353,15 @@
                     try {
                         const data = JSON.parse(event.data);
                         handlePolymarketMessage(data);
-                    } catch (e) {
-                        // Ignore parse errors
-                    }
+                    } catch (e) {}
                 };
 
-                ws.onerror = (error) => {
-                    console.error('Polymarket WSS error:', error);
-                    updatePolymarketStatus('error', 'Connection error');
-                };
+                ws.onerror = () => updatePolymarketStatus('error', 'Error');
 
                 ws.onclose = () => {
-                    console.log('Polymarket WSS closed');
                     polymarketState.status = 'disconnected';
                     updatePolymarketStatus('error', 'Disconnected');
 
-                    // Reconnect after delay
                     setTimeout(() => {
                         if (polymarketState.market) {
                             connectPolymarketWS();
@@ -1383,14 +1370,11 @@
                 };
 
             } catch (e) {
-                console.error('Failed to connect to Polymarket:', e);
-                updatePolymarketStatus('error', 'Failed to connect');
+                updatePolymarketStatus('error', 'Failed');
             }
         }
 
-        // Handle Polymarket WebSocket messages
         function handlePolymarketMessage(data) {
-            // Handle array (snapshot)
             if (Array.isArray(data)) {
                 for (const item of data) {
                     if (typeof item === 'object') {
@@ -1400,12 +1384,10 @@
                 return;
             }
 
-            // Handle object
             if (typeof data === 'object') {
                 if (data.bids || data.asks) {
                     processOrderbookUpdate(data);
                 } else if (data.price_changes) {
-                    // Price change updates
                     for (const change of data.price_changes) {
                         if (change.asset_id === polymarketState.tokenUp) {
                             polymarketState.priceUp = parseFloat(change.price) || polymarketState.priceUp;
@@ -1413,18 +1395,16 @@
                             polymarketState.priceDown = parseFloat(change.price) || polymarketState.priceDown;
                         }
                     }
-                    updatePolymarketPrices();
+                    updatePolymarketUI();
                 }
             }
         }
 
-        // Process orderbook update
         function processOrderbookUpdate(data) {
             const assetId = data.asset_id;
             const bids = data.bids || [];
             const asks = data.asks || [];
 
-            // Parse best bid/ask (filter out zero-size orders)
             let bestBid = null, bestAsk = null;
 
             if (bids.length > 0) {
@@ -1446,90 +1426,49 @@
             if (assetId === polymarketState.tokenUp) {
                 if (bestBid !== null) polymarketState.bidUp = bestBid;
                 if (bestAsk !== null) polymarketState.askUp = bestAsk;
-                // Update mid-price only if we have both bid and ask
                 if (polymarketState.bidUp !== null && polymarketState.askUp !== null) {
                     polymarketState.priceUp = (polymarketState.bidUp + polymarketState.askUp) / 2;
                 }
             } else if (assetId === polymarketState.tokenDown) {
                 if (bestBid !== null) polymarketState.bidDown = bestBid;
                 if (bestAsk !== null) polymarketState.askDown = bestAsk;
-                // Update mid-price only if we have both bid and ask
                 if (polymarketState.bidDown !== null && polymarketState.askDown !== null) {
                     polymarketState.priceDown = (polymarketState.bidDown + polymarketState.askDown) / 2;
                 }
             }
 
-            updatePolymarketPrices();
+            updatePolymarketUI();
         }
 
-        // Update Polymarket price display
-        function updatePolymarketPrices() {
-            const priceUpEl = document.getElementById('polyPriceUp');
-            const priceDownEl = document.getElementById('polyPriceDown');
-            const bidAskUpEl = document.getElementById('polyBidAskUp');
-            const bidAskDownEl = document.getElementById('polyBidAskDown');
-
-            if (priceUpEl) {
-                priceUpEl.textContent = `${(polymarketState.priceUp * 100).toFixed(1)}¢`;
-            }
-            if (priceDownEl) {
-                priceDownEl.textContent = `${(polymarketState.priceDown * 100).toFixed(1)}¢`;
-            }
-
-            if (bidAskUpEl) {
-                if (polymarketState.bidUp !== null && polymarketState.askUp !== null) {
-                    bidAskUpEl.textContent = `Bid: ${(polymarketState.bidUp * 100).toFixed(1)}¢ / Ask: ${(polymarketState.askUp * 100).toFixed(1)}¢`;
-                }
-            }
-            if (bidAskDownEl) {
-                if (polymarketState.bidDown !== null && polymarketState.askDown !== null) {
-                    bidAskDownEl.textContent = `Bid: ${(polymarketState.bidDown * 100).toFixed(1)}¢ / Ask: ${(polymarketState.askDown * 100).toFixed(1)}¢`;
-                }
-            }
-        }
-
-        // Update Polymarket status indicator
         function updatePolymarketStatus(status, text) {
-            const dot = document.getElementById('polyStatus');
+            const dot = document.getElementById('polyStatusDot');
             const textEl = document.getElementById('polyStatusText');
 
             if (dot) {
-                dot.className = `status-dot ${status}`;
+                dot.className = `poly-status-dot ${status}`;
             }
             if (textEl) {
                 textEl.textContent = text;
             }
         }
 
-        // Initialize application
+        // Initialize
         function init() {
-            createStatusBar();
             createExchangeCards();
             initCharts();
 
-            // Connect to all exchanges
             Object.keys(exchanges).forEach(key => {
                 connectWebSocket(key);
             });
 
-            // Initialize Polymarket
             fetchPolymarketMarket();
 
-            // Periodic UI refresh
             setInterval(() => {
-                Object.keys(exchanges).forEach(key => {
-                    if (state[key].currentPrice) {
-                        updateExchangeUI(key);
-                    }
-                });
-                updateComparisonChart();
-                updateSpreadAnalysis();
                 updatePolymarketTimer();
-                updatePolymarketRefPrice();
+                updateMetrics();
             }, 1000);
         }
 
-        // Start when DOM is ready
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
