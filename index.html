@@ -411,24 +411,60 @@
             height: 8px;
         }
 
-        .polymarket-reference {
-            text-align: center;
+        .polymarket-price-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
             margin-bottom: 20px;
+        }
+
+        .polymarket-strike,
+        .polymarket-current {
+            text-align: center;
             padding: 15px;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 10px;
         }
 
+        .polymarket-strike {
+            border: 1px solid rgba(255, 184, 0, 0.3);
+        }
+
+        .polymarket-current {
+            border: 1px solid rgba(100, 255, 218, 0.3);
+        }
+
+        .strike-label,
         .reference-label {
             font-size: 0.85rem;
             color: #8892b0;
             margin-bottom: 8px;
         }
 
+        .strike-price {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #ffb800;
+        }
+
         .reference-price {
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: 700;
             color: #64ffda;
+        }
+
+        .price-diff {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .price-diff.positive {
+            color: #2ecc71;
+        }
+
+        .price-diff.negative {
+            color: #e74c3c;
         }
 
         @media (max-width: 600px) {
@@ -444,12 +480,21 @@
                 font-size: 1.4rem;
             }
 
+            .polymarket-price-row {
+                grid-template-columns: 1fr;
+            }
+
             .polymarket-prices {
                 grid-template-columns: 1fr;
             }
 
             .price-card-value {
                 font-size: 2rem;
+            }
+
+            .strike-price,
+            .reference-price {
+                font-size: 1.5rem;
             }
         }
     </style>
@@ -1032,8 +1077,11 @@
             ws: null,
             status: 'disconnected',
             endTime: null,
+            startTime: null,
             question: '',
-            fetching: false  // Prevent multiple fetches
+            fetching: false,  // Prevent multiple fetches
+            strikePrice: null,  // BTC price at window start
+            strikeCaptured: false  // Flag to capture strike once
         };
 
         // Get current 15-min window timestamp
@@ -1116,7 +1164,16 @@
                     polymarketState.priceUp = priceUp;
                     polymarketState.priceDown = priceDown;
                     polymarketState.endTime = endTime;
+                    polymarketState.startTime = new Date(endTime.getTime() - 15 * 60 * 1000); // 15 min before end
                     polymarketState.question = clobData.question || `BTC Up/Down by ${endTime.toLocaleTimeString()}`;
+
+                    // Capture strike price (current avg price when we discover the market)
+                    const avgPrice = getAverageBtcPrice();
+                    if (avgPrice && !polymarketState.strikeCaptured) {
+                        polymarketState.strikePrice = avgPrice;
+                        polymarketState.strikeCaptured = true;
+                        console.log('Strike price captured:', polymarketState.strikePrice);
+                    }
 
                     console.log('Found Polymarket BTC market:', polymarketState.question);
                     polymarketState.fetching = false;
@@ -1155,15 +1212,26 @@
         // Render Polymarket UI
         function renderPolymarketUI() {
             const container = document.getElementById('polymarketContainer');
+            const strikeDisplay = polymarketState.strikePrice
+                ? `$${polymarketState.strikePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : 'Capturing...';
+
             container.innerHTML = `
                 <div class="polymarket-market">
                     <div class="polymarket-header">
                         <div class="polymarket-question">${polymarketState.question}</div>
                         <div class="polymarket-timer" id="polyTimer">--:--</div>
                     </div>
-                    <div class="polymarket-reference">
-                        <div class="reference-label">Oracle Reference Price (Avg of Exchanges)</div>
-                        <div class="reference-price" id="polyRefPrice">Loading...</div>
+                    <div class="polymarket-price-row">
+                        <div class="polymarket-strike">
+                            <div class="strike-label">Strike Price (Window Start)</div>
+                            <div class="strike-price" id="polyStrikePrice">${strikeDisplay}</div>
+                        </div>
+                        <div class="polymarket-current">
+                            <div class="reference-label">Current Price (Live)</div>
+                            <div class="reference-price" id="polyRefPrice">Loading...</div>
+                            <div class="price-diff" id="polyPriceDiff">--</div>
+                        </div>
                     </div>
                     <div class="polymarket-prices">
                         <div class="price-card up">
@@ -1182,7 +1250,7 @@
                             <div class="status-dot connecting" id="polyStatus"></div>
                             <span id="polyStatusText">Connecting to orderbook...</span>
                         </div>
-                        <div>Window ends: ${polymarketState.endTime.toLocaleTimeString()}</div>
+                        <div>Window: ${polymarketState.startTime.toLocaleTimeString()} - ${polymarketState.endTime.toLocaleTimeString()}</div>
                     </div>
                 </div>
             `;
@@ -1193,11 +1261,31 @@
         // Update reference price display
         function updatePolymarketRefPrice() {
             const refPriceEl = document.getElementById('polyRefPrice');
+            const diffEl = document.getElementById('polyPriceDiff');
+            const strikeEl = document.getElementById('polyStrikePrice');
             if (!refPriceEl) return;
 
             const avgPrice = getAverageBtcPrice();
             if (avgPrice) {
                 refPriceEl.textContent = `$${avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+                // Update strike price if not captured yet
+                if (!polymarketState.strikeCaptured && polymarketState.market) {
+                    polymarketState.strikePrice = avgPrice;
+                    polymarketState.strikeCaptured = true;
+                    if (strikeEl) {
+                        strikeEl.textContent = `$${avgPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    }
+                }
+
+                // Show price difference from strike
+                if (diffEl && polymarketState.strikePrice) {
+                    const diff = avgPrice - polymarketState.strikePrice;
+                    const diffPercent = (diff / polymarketState.strikePrice) * 100;
+                    const sign = diff >= 0 ? '+' : '';
+                    diffEl.textContent = `${sign}$${diff.toFixed(2)} (${sign}${diffPercent.toFixed(3)}%)`;
+                    diffEl.className = `price-diff ${diff >= 0 ? 'positive' : 'negative'}`;
+                }
             } else {
                 refPriceEl.textContent = 'Waiting for data...';
             }
@@ -1226,6 +1314,8 @@
                 polymarketState.askUp = null;
                 polymarketState.bidDown = null;
                 polymarketState.askDown = null;
+                polymarketState.strikePrice = null;
+                polymarketState.strikeCaptured = false;
                 // Fetch new market
                 setTimeout(fetchPolymarketMarket, 2000);
                 return;
